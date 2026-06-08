@@ -80,11 +80,11 @@
         .azul-hole { background-color: transparent; box-shadow: 0 0 0 300vmax #0000CD; opacity: 0; }
 
         /* Clases activas cuando hay gol (Se asignan desde Javascript) */
-        .is-goal .gol-overlay { animation: showGoal 7s linear forwards; }
-        .is-goal .celeste-solid { animation: solidCeleste 7s ease-in-out forwards; }
-        .is-goal .celeste-hole { animation: holeCeleste 7s ease-in-out forwards; }
-        .is-goal .azul-solid { animation: solidAzul 7s ease-in-out forwards; }
-        .is-goal .azul-hole { animation: holeAzul 7s ease-in-out forwards; }
+        .is-goal .gol-overlay { animation: showGoal 7s linear forwards; animation-delay: var(--delay, 0ms); }
+        .is-goal .celeste-solid { animation: solidCeleste 7s ease-in-out forwards; animation-delay: var(--delay, 0ms); }
+        .is-goal .celeste-hole { animation: holeCeleste 7s ease-in-out forwards; animation-delay: var(--delay, 0ms); }
+        .is-goal .azul-solid { animation: solidAzul 7s ease-in-out forwards; animation-delay: var(--delay, 0ms); }
+        .is-goal .azul-hole { animation: holeAzul 7s ease-in-out forwards; animation-delay: var(--delay, 0ms); }
 
         /* Keyframes del gol */
         /* Keyframes del gol */
@@ -227,16 +227,21 @@
     </div>
 
     <script>
+        // Guardamos el momento exacto en el que el HTML se empezó a mostrar
+        const pageLoadTime = Date.now();
+
         const container = document.querySelector('.container');
         const golVideo = document.querySelector('.gol-overlay');
         
-        // Cuando inicia la animación CSS de gol, esperamos 3.03s para reproducir el video
+        // Cuando inicia la animación CSS de gol, esperamos a que llegue al 3.03s del tiempo general del contenido
         golVideo.addEventListener('animationstart', () => {
             golVideo.pause();
             golVideo.currentTime = 0;
+            const elapsed = Date.now() - pageLoadTime;
+            const waitTime = Math.max(0, 3030 - elapsed);
             setTimeout(() => {
                 golVideo.play().catch(e => console.error("Error al reproducir el video:", e));
-            }, 3030);
+            }, waitTime);
         });
 
         // Cuando termina la animación de gol, reseteamos las clases para que esté listo para el próximo
@@ -316,9 +321,10 @@
                     localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
                     localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
 
-                    // Si detectamos un gol mientras estábamos apagados, ¡disparamos la animación inmediatamente!
+                    // Si detectamos un gol mientras estábamos apagados, calculamos el tiempo y lanzamos
                     if (isHiddenGoal) {
-                        triggerGoalAnimation(nuevoHome, nuevoAway);
+                        const elapsed = Date.now() - pageLoadTime;
+                        triggerGoalAnimation(nuevoHome, nuevoAway, elapsed);
                     }
                     
                     // Iniciar el chequeo de goles
@@ -331,23 +337,26 @@
             }
         }
 
-        // Función para activar visualmente el gol
-        function triggerGoalAnimation(newHomeScore, newAwayScore) {
-            console.log("¡GOL DETECTADO! Activando animación...");
+        // Función para activar visualmente el gol sincronizado
+        function triggerGoalAnimation(newHomeScore, newAwayScore, timeElapsed = 0) {
+            console.log(`¡GOL DETECTADO! Sincronizando animación con retraso de ${timeElapsed}ms...`);
             
-            // Actualizar variables de estado internas para no volver a disparar el evento
+            // Actualizar variables de estado internas
             currentHomeScore = newHomeScore;
             currentAwayScore = newAwayScore;
+
+            // Adelantar toda la animación CSS usando un delay negativo igual al tiempo transcurrido
+            container.style.setProperty('--delay', `-${timeElapsed}ms`);
 
             // Reproducir toda la animación CSS y video agregando la clase 'is-goal' al contenedor
             container.classList.add('is-goal');
 
-            // Actualizar el DOM exactamente a los 3500ms (mitad de la animación)
-            // Esto ocurre mientras el video del gol cubre completamente la pantalla
+            // Actualizar el DOM exactamente a los 3500ms del tiempo global del anuncio
+            const domUpdateWait = Math.max(0, 3500 - timeElapsed);
             setTimeout(() => {
                 document.getElementById('home-score').innerText = newHomeScore;
                 document.getElementById('away-score').innerText = newAwayScore;
-            }, 3500);
+            }, domUpdateWait);
         }
 
         // --- POLLING (Consulta periódica para detectar goles) ---
@@ -365,12 +374,26 @@
                         const nuevoHome = parseInt(partido.marcador.local) || 0;
                         const nuevoAway = parseInt(partido.marcador.visitante) || 0;
 
-                        // Si alguno de los puntajes es mayor al que teníamos guardado, ¡hubo un gol!
+                        // Si alguno de los puntajes es mayor al que teníamos guardado, ¡hubo un gol en vivo!
                         if (nuevoHome > currentHomeScore || nuevoAway > currentAwayScore) {
-                            triggerGoalAnimation(nuevoHome, nuevoAway);
-                            // Actualizar la memoria para que sobreviva a un cierre/recarga inesperado
-                            localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
-                            localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
+                            const timeElapsed = Date.now() - pageLoadTime;
+
+                            // Si estamos dentro de los primeros 3.03s (3030ms) de mostrar la página, lanzamos la animación
+                            if (timeElapsed <= 3030) {
+                                triggerGoalAnimation(nuevoHome, nuevoAway, timeElapsed);
+                                // Actualizar la memoria permanente
+                                localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
+                                localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
+                            } else {
+                                // Si pasamos los 3.03s, el video de gol no alcanzaría a mostrarse bien.
+                                console.log(`Gol detectado muy tarde (${timeElapsed}ms). Se pospone la animación para la siguiente pasada.`);
+                                
+                                // Actualizamos memoria local para no repetir este log, 
+                                // pero dejamos el localStorage SIN ACTUALIZAR. 
+                                // Así, en la próxima carga de la página, detectará un gol oculto al instante.
+                                currentHomeScore = nuevoHome;
+                                currentAwayScore = nuevoAway;
+                            }
                         }
                     }
                 } catch (err) {
