@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animación de Gol</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        /* Contenedor principal */
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+
+        /* Video de fondo (remplaza a la imagen de fondo) */
+        .video-fondo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: fill; /* Ocupa todo el ancho y alto sin recortar (puede estirarse) */
+            z-index: 0;
+        }
+
+        /* Capa del gol (imagen o video) */
+        .gol-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: fill; /* Ocupa todo el ancho y alto sin recortar */
+            opacity: 0; 
+            z-index: 20;
+        }
+
+        /* Contenedor de las capas de transición */
+        .transition-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 25; /* Por encima del gol */
+            overflow: hidden; 
+            pointer-events: none;
+        }
+
+        /* Base para las formas circulares */
+        .wipe-element {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            width: 0;
+            height: 0;
+        }
+
+        /* CELESTE */
+        .celeste-solid { background-color: #00BFFF; }
+        .celeste-hole { background-color: transparent; box-shadow: 0 0 0 300vmax #00BFFF; opacity: 0; }
+
+        /* AZUL */
+        .azul-solid { background-color: #0000CD; }
+        .azul-hole { background-color: transparent; box-shadow: 0 0 0 300vmax #0000CD; opacity: 0; }
+
+        /* Clases activas cuando hay gol (Se asignan desde Javascript) */
+        .is-goal .gol-overlay { animation: showGoal 7s linear forwards; }
+        .is-goal .celeste-solid { animation: solidCeleste 7s ease-in-out forwards; }
+        .is-goal .celeste-hole { animation: holeCeleste 7s ease-in-out forwards; }
+        .is-goal .azul-solid { animation: solidAzul 7s ease-in-out forwards; }
+        .is-goal .azul-hole { animation: holeAzul 7s ease-in-out forwards; }
+
+        /* Keyframes del gol */
+        /* Keyframes del gol */
+        @keyframes showGoal {
+            0% { opacity: 0; }
+            43.28% { opacity: 0; } /* 3.03s (3030 / 7000) */
+            50.00% { opacity: 1; } /* Termina el fade in suave */
+            88.14% { opacity: 1; } /* 6.17s (6170 / 7000) Empieza la transición */
+            92.14% { opacity: 0; } /* Se desvanece mientras la transición azul lo cubre */
+            100% { opacity: 0; }
+        }
+
+        /* KEYFRAMES CELESTE */
+        @keyframes solidCeleste {
+            0%, 88.13% { width: 0; height: 0; opacity: 1; } /* Inicia en 6.17s */
+            90.71%, 94.27% { width: 300vmax; height: 300vmax; opacity: 1; }
+            94.28%, 100% { width: 300vmax; height: 300vmax; opacity: 0; }
+        }
+        @keyframes holeCeleste {
+            0%, 94.27% { width: 0; height: 0; opacity: 0; }
+            94.28% { width: 0; height: 0; opacity: 1; }
+            98.57%, 100% { width: 300vmax; height: 300vmax; opacity: 1; }
+        }
+
+        /* KEYFRAMES AZUL */
+        @keyframes solidAzul {
+            0%, 89.56% { width: 0; height: 0; opacity: 1; }
+            92.14% { width: 300vmax; height: 300vmax; opacity: 1; }
+            92.15%, 100% { width: 300vmax; height: 300vmax; opacity: 0; }
+        }
+        @keyframes holeAzul {
+            0%, 92.14% { width: 0; height: 0; opacity: 0; }
+            92.15% { width: 0; height: 0; opacity: 1; } 
+            96.42%, 100% { width: 300vmax; height: 300vmax; opacity: 1; } 
+        }
+        
+        /* Texto de prueba (Opcional) */
+        h1 {
+            color: white;
+            z-index: 10;
+            font-family: Arial, sans-serif;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* Estilos del marcador (Ajustado para 768x320) */
+        .scoreboard {
+            position: absolute;
+            bottom: 32px;
+            right: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: #ffffff;
+            font-family: 'Impact', 'Inter', sans-serif;
+            z-index: 10;
+        }
+
+        .team-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0 18px;
+            gap: 22px; /* Reducido para ahorrar espacio vertical */
+        }
+
+        .team-score {
+            font-size: 5rem; /* Ajustado para que entre en la altura de 320px */
+            font-weight: 800;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            margin-bottom: -5px; /* Acerca el puntaje al nombre */
+            line-height: 1;
+        }
+
+        .team-name {
+            font-size: 37px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            line-height: 1;
+            margin: 0;
+        }
+
+        .team-logo {
+            width: 28px; /* Ajustado */
+            height: 28px; /* Ajustado */
+            border-radius: 50%;
+            border: 3px solid white;
+            background-color: white;
+            object-fit: contain;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .divider {
+            width: 4px;
+            height: 160px;
+            background-color: white;
+            border-radius: 2px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Video de fondo (siempre reproduciéndose en bucle) -->
+        <video class="video-fondo" autoplay muted loop playsinline>
+            <source src="./assets/FONDO MARCADOR.mp4" type="video/mp4">
+        </video>
+
+        <!-- Video del gol superpuesto con animación CSS -->
+        <video class="gol-overlay" muted playsinline>
+            <source src="./assets/GOL.mp4" type="video/mp4">
+        </video>
+
+        <!-- Capas de transición circulares (Abre el hueco desde el centro) -->
+        <div class="transition-container">
+            <div class="wipe-element celeste-solid"></div>
+            <div class="wipe-element celeste-hole"></div>
+            <div class="wipe-element azul-solid"></div>
+            <div class="wipe-element azul-hole"></div>
+        </div>
+
+        <!-- Marcador superpuesto -->
+        <div class="scoreboard" id="scoreboard" style="display: none;">
+            <div class="team-col">
+                <span class="team-score" id="home-score">0</span>
+                <span class="team-name" id="home-name">LOCAL</span>
+                <img class="team-logo" id="home-logo" src="" alt="Home">
+            </div>
+            <div class="team-col">
+                <span class="team-score" id="away-score">0</span>
+                <span class="team-name" id="away-name">VISITA</span>
+                <img class="team-logo" id="away-logo" src="" alt="Away">
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const container = document.querySelector('.container');
+        const golVideo = document.querySelector('.gol-overlay');
+        
+        // Cuando inicia la animación CSS de gol, esperamos 3.03s para reproducir el video
+        golVideo.addEventListener('animationstart', () => {
+            golVideo.pause();
+            golVideo.currentTime = 0;
+            setTimeout(() => {
+                golVideo.play().catch(e => console.error("Error al reproducir el video:", e));
+            }, 3030);
+        });
+
+        // Cuando termina la animación de gol, reseteamos las clases para que esté listo para el próximo
+        golVideo.addEventListener('animationend', () => {
+            container.classList.remove('is-goal');
+            golVideo.pause();
+            golVideo.currentTime = 0;
+        });
+
+        // --- CONEXIÓN AL NUEVO API ---
+        const API_URL = 'https://alacapipollamundialista.alacoohperu.pe/api/public';
+
+        // Variables de estado
+        let currentHomeScore = 0;
+        let currentAwayScore = 0;
+
+        // Función auxiliar para abreviar el nombre del equipo
+        const getShortName = (name, codigo_iso) => {
+            if (codigo_iso && codigo_iso.length === 3) return codigo_iso.toUpperCase();
+            return name.substring(0, 3).toUpperCase();
+        };
+
+        // Función inicial para cargar datos del partido
+        async function fetchInitialFixtureData(fixtureId) {
+            try {
+                // Consultar listado por fixture_id
+                const response = await fetch(`${API_URL}/partidos?id=${fixtureId}`, { cache: "no-store" });
+                
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+                
+                // Al buscar por filtro, esperamos un arreglo dentro de 'partidos'
+                if (data && data.partidos && data.partidos.length > 0) {
+                    const partido = data.partidos[0];
+                    const local = partido.local;
+                    const visitante = partido.visitante;
+                    const marcador = partido.marcador;
+
+                    const nuevoHome = parseInt(marcador.local) || 0;
+                    const nuevoAway = parseInt(marcador.visitante) || 0;
+
+                    // Revisar memoria (localStorage) para ver cómo quedó el partido la última vez
+                    const savedHomeStr = localStorage.getItem(`alac_home_${fixtureId}`);
+                    const savedAwayStr = localStorage.getItem(`alac_away_${fixtureId}`);
+                    const savedHome = savedHomeStr !== null ? parseInt(savedHomeStr) : null;
+                    const savedAway = savedAwayStr !== null ? parseInt(savedAwayStr) : null;
+
+                    let isHiddenGoal = false;
+
+                    // Si teníamos un marcador anterior guardado y el nuevo es MAYOR, hubo gol mientras no estábamos
+                    if (savedHome !== null && savedAway !== null && (nuevoHome > savedHome || nuevoAway > savedAway)) {
+                        isHiddenGoal = true;
+                        // Pintamos la pantalla temporalmente con el marcador VIEJO
+                        currentHomeScore = savedHome;
+                        currentAwayScore = savedAway;
+                    } else {
+                        // Pintamos con el marcador actual normal
+                        currentHomeScore = nuevoHome;
+                        currentAwayScore = nuevoAway;
+                    }
+
+                    // Mostrar el contenedor del marcador
+                    document.getElementById('scoreboard').style.display = 'flex';
+                    
+                    // Asignar datos del local
+                    if (local.logo || local.bandera) document.getElementById('home-logo').src = local.logo || local.bandera;
+                    document.getElementById('home-name').innerText = getShortName(local.nombre, local.codigo_iso);
+                    document.getElementById('home-score').innerText = currentHomeScore;
+
+                    // Asignar datos del visitante
+                    if (visitante.logo || visitante.bandera) document.getElementById('away-logo').src = visitante.logo || visitante.bandera;
+                    document.getElementById('away-name').innerText = getShortName(visitante.nombre, visitante.codigo_iso);
+                    document.getElementById('away-score').innerText = currentAwayScore;
+
+                    // Guardar el resultado real más reciente en la memoria para la próxima carga
+                    localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
+                    localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
+
+                    // Si detectamos un gol mientras estábamos apagados, ¡disparamos la animación inmediatamente!
+                    if (isHiddenGoal) {
+                        triggerGoalAnimation(nuevoHome, nuevoAway);
+                    }
+                    
+                    // Iniciar el chequeo de goles
+                    startGoalPolling(fixtureId);
+                } else {
+                    console.error("No se encontró el partido con fixture_id:", fixtureId);
+                }
+            } catch (error) {
+                console.error(`Error al consultar el partido inicial ${fixtureId}:`, error);
+            }
+        }
+
+        // Función para activar visualmente el gol
+        function triggerGoalAnimation(newHomeScore, newAwayScore) {
+            console.log("¡GOL DETECTADO! Activando animación...");
+            
+            // Actualizar variables de estado internas para no volver a disparar el evento
+            currentHomeScore = newHomeScore;
+            currentAwayScore = newAwayScore;
+
+            // Reproducir toda la animación CSS y video agregando la clase 'is-goal' al contenedor
+            container.classList.add('is-goal');
+
+            // Actualizar el DOM exactamente a los 3500ms (mitad de la animación)
+            // Esto ocurre mientras el video del gol cubre completamente la pantalla
+            setTimeout(() => {
+                document.getElementById('home-score').innerText = newHomeScore;
+                document.getElementById('away-score').innerText = newAwayScore;
+            }, 3500);
+        }
+
+        // --- POLLING (Consulta periódica para detectar goles) ---
+        function startGoalPolling(fixtureId) {
+            console.log("Iniciando consulta constante para detectar goles...");
+            
+            // Revisa cada 1 segundo (1000ms)
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_URL}/partidos?id=${fixtureId}`, { cache: "no-store" });
+                    const result = await response.json();
+                    
+                    if (result && result.partidos && result.partidos.length > 0) {
+                        const partido = result.partidos[0];
+                        const nuevoHome = parseInt(partido.marcador.local) || 0;
+                        const nuevoAway = parseInt(partido.marcador.visitante) || 0;
+
+                        // Si alguno de los puntajes es mayor al que teníamos guardado, ¡hubo un gol!
+                        if (nuevoHome > currentHomeScore || nuevoAway > currentAwayScore) {
+                            triggerGoalAnimation(nuevoHome, nuevoAway);
+                            // Actualizar la memoria para que sobreviva a un cierre/recarga inesperado
+                            localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
+                            localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error consultando endpoint de gol:", err);
+                }
+            }, 1000);
+        }
+
+        // Obtener el ID de la URL y arrancar
+        const urlParams = new URLSearchParams(window.location.search);
+        let fixtureId = urlParams.get('id');
+
+        if (!fixtureId) {
+            console.log("No se proporcionó ID en la URL. Usando el ID 9 por defecto.");
+            fixtureId = 9;
+        }
+        
+        fetchInitialFixtureData(fixtureId);
+    </script>
+</body>
+</html>
