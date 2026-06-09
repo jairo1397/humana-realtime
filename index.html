@@ -260,8 +260,8 @@
 
         // Función auxiliar para abreviar el nombre del equipo
         const getShortName = (name, codigo_iso) => {
-            if (codigo_iso && codigo_iso.length === 3) return codigo_iso.toUpperCase();
-            return name.substring(0, 3).toUpperCase();
+            if (codigo_iso && codigo_iso.trim()) return codigo_iso.trim().toUpperCase();
+            return name ? name.substring(0, 3).toUpperCase() : "";
         };
 
         // Función inicial para cargar datos del partido
@@ -308,12 +308,14 @@
                     document.getElementById('scoreboard').style.display = 'flex';
                     
                     // Asignar datos del local
-                    if (local.logo || local.bandera) document.getElementById('home-logo').src = local.logo || local.bandera;
+                    const homeLogoUrl = local.bandera_url || local.bandera || local.logo;
+                    if (homeLogoUrl) document.getElementById('home-logo').src = homeLogoUrl;
                     document.getElementById('home-name').innerText = getShortName(local.nombre, local.codigo_iso);
                     document.getElementById('home-score').innerText = currentHomeScore;
 
                     // Asignar datos del visitante
-                    if (visitante.logo || visitante.bandera) document.getElementById('away-logo').src = visitante.logo || visitante.bandera;
+                    const awayLogoUrl = visitante.bandera_url || visitante.bandera || visitante.logo;
+                    if (awayLogoUrl) document.getElementById('away-logo').src = awayLogoUrl;
                     document.getElementById('away-name').innerText = getShortName(visitante.nombre, visitante.codigo_iso);
                     document.getElementById('away-score').innerText = currentAwayScore;
 
