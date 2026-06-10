@@ -23,13 +23,14 @@
 
         /* Contenedor principal */
         .container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 768px;
+            height: 320px;
             background-color: #000;
+            transform-origin: top left;
+            overflow: hidden;
         }
 
         /* Video de fondo (remplaza a la imagen de fondo) */
@@ -165,50 +166,50 @@
 
         /* Estilos del marcador (Ajustado para 768x320) */
         .scoreboard {
-position: absolute;
-    bottom: 34px;
-    right: 21px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: #ffffff;
-    font-family: 'Axiforma Black', 'Impact', sans-serif;
-    z-index: 10;
+            position: absolute;
+            bottom: 34px;
+            right: 21px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            color: #ffffff;
+            font-family: 'Axiforma Black', 'Impact', sans-serif;
+            z-index: 10;
         }
 
         .team-col {
-display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0 18px;
-    gap: 17px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0 18px;
+            gap: 17px;
         }
 
         .team-score {
-font-size: 5.5rem;
-    font-weight: 800;
-    margin-bottom: -5px;
-    line-height: 1;
+            font-size: 5.5rem;
+            font-weight: 800;
+            margin-bottom: -5px;
+            line-height: 1;
         }
 
         .team-name {
-font-size: 39px;
-    font-weight: 900;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    line-height: 1;
-    margin: 0;
+            font-size: 39px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            line-height: 1;
+            margin: 0;
         }
 
         .team-logo {
-width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 3px solid white;
-    background-color: white;
-    object-fit: cover;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 3px solid white;
+            background-color: white;
+            object-fit: cover;
         }
 
         .divider {
@@ -258,6 +259,16 @@ width: 30px;
     </div>
 
     <script>
+        // --- ESCALADO AUTOMÁTICO --- 
+        function ajustarEscala() {
+            const container = document.querySelector('.container');
+            const scaleX = window.innerWidth / 768;
+            const scaleY = window.innerHeight / 320;
+            container.style.transform = `scale(${scaleX}, ${scaleY})`;
+        }
+        window.addEventListener('resize', ajustarEscala);
+        ajustarEscala();
+
         // Guardamos el momento exacto en el que el HTML se empezó a mostrar
         const pageLoadTime = Date.now();
 
