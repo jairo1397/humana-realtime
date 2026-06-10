@@ -164,16 +164,17 @@
         }
 
         /* Estilos del marcador (Ajustado para 768x320) */
+        /* Estilos del marcador (Ajustado para 768x320) */
         .scoreboard {
             position: absolute;
-            bottom: 45px;
-            right: 69px;
+            bottom: 32px;
+            right: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
             background: transparent;
             color: #ffffff;
-            font-family: 'Axiforma Black', 'Impact', sans-serif;
+            font-family: 'Impact', 'Inter', sans-serif;
             z-index: 10;
         }
 
@@ -187,14 +188,14 @@
         }
 
         .team-score {
-            font-size: 7rem;
+            font-size: 5rem; /* Ajustado para que entre en la altura de 320px */
             font-weight: 800;
-            margin-bottom: -5px;
+            margin-bottom: -5px; /* Acerca el puntaje al nombre */
             line-height: 1;
         }
 
         .team-name {
-            font-size: 49px;
+            font-size: 37px;
             font-weight: 900;
             letter-spacing: 2px;
             text-transform: uppercase;
@@ -203,12 +204,12 @@
         }
 
         .team-logo {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 3px solid white;
-    background-color: white;
-    object-fit: cover;
+            width: 28px; /* Ajustado */
+            height: 28px; /* Ajustado */
+            border-radius: 50%;
+            border: 3px solid white;
+            background-color: white;
+            object-fit: cover;
         }
 
         .divider {
@@ -216,7 +217,6 @@
             height: 160px;
             background-color: white;
             border-radius: 2px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
     </style>
 </head>
