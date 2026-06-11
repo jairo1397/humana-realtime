@@ -167,7 +167,7 @@
         /* Estilos del marcador (Ajustado para 768x320) */
         .scoreboard {
             position: absolute;
-            bottom: 34px;
+            bottom: 60px;
             right: 18px;
             display: flex;
             align-items: center;
@@ -258,6 +258,7 @@
         
     </div>
 
+    <script src="./js/GoalManager.js"></script>
     <script>
         // --- ESCALADO AUTOMÁTICO --- 
         function ajustarEscala() {
@@ -269,231 +270,6 @@
         window.addEventListener('resize', ajustarEscala);
         ajustarEscala();
 
-        // Guardamos el momento exacto en el que el HTML se empezó a mostrar
-        const pageLoadTime = Date.now();
-
-        const container = document.querySelector('.container');
-        const golVideo = document.querySelector('.gol-overlay');
-        const azulHole = document.querySelector('.azul-hole');
-        
-        // Cuando inicia la animación CSS de gol, esperamos a que llegue al 3.03s del tiempo general del contenido
-        golVideo.addEventListener('animationstart', () => {
-            golVideo.pause();
-            golVideo.currentTime = 0;
-            const elapsed = Date.now() - pageLoadTime;
-            const waitTime = Math.max(0, 3030 - elapsed);
-            setTimeout(() => {
-                golVideo.play().catch(e => console.error("Error al reproducir el video:", e));
-            }, waitTime);
-        });
-
-        const resetAnimations = () => {
-            container.classList.remove('is-goal');
-            container.classList.remove('is-goal-other');
-            golVideo.pause();
-            golVideo.currentTime = 0;
-        };
-
-        // Cuando termina la animación de gol, reseteamos las clases para que esté listo para el próximo
-        golVideo.addEventListener('animationend', resetAnimations);
-        
-        // Para la animación de otros equipos, escuchamos el final de los círculos (por ejemplo el hole azul)
-        azulHole.addEventListener('animationend', (e) => {
-            // Solo si es la animación de otros equipos (otherHoleAzul)
-            if (e.animationName === 'otherHoleAzul') {
-                resetAnimations();
-            }
-        });
-
-        // --- CONEXIÓN AL NUEVO API ---
-        const API_URL = 'https://alacapipollamundialista.alacoohperu.pe/api/public';
-
-        // Variables de estado
-        let currentHomeScore = 0;
-        let currentAwayScore = 0;
-
-        // Función auxiliar para abreviar el nombre del equipo
-        const getShortName = (name, codigo_iso) => {
-            if (codigo_iso && codigo_iso.trim()) return codigo_iso.trim().toUpperCase();
-            return name ? name.substring(0, 3).toUpperCase() : "";
-        };
-
-        // Función para verificar si el gol es de Ecuador
-        function checkEcuadorGoal(nuevoHome, currentHomeScore, nuevoAway, currentAwayScore, partido) {
-            let isEcuador = false;
-            const checkTeam = (team) => {
-                if (!team) return false;
-                if (team.codigo_iso && team.codigo_iso.toUpperCase() === 'ECU') return true;
-                if (team.nombre && team.nombre.toUpperCase().includes('ECUADOR')) return true;
-                return false;
-            };
-
-            if (nuevoHome > currentHomeScore && checkTeam(partido.local)) {
-                isEcuador = true;
-            }
-            if (nuevoAway > currentAwayScore && checkTeam(partido.visitante)) {
-                isEcuador = true;
-            }
-            return isEcuador;
-        }
-
-        // Función inicial para cargar datos del partido
-        async function fetchInitialFixtureData(fixtureId) {
-            try {
-                // Consultar listado por fixture_id
-                const response = await fetch(`${API_URL}/partidos?id=${fixtureId}`, { cache: "no-store" });
-                
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
-                const data = await response.json();
-                
-                // Al buscar por filtro, esperamos un arreglo dentro de 'partidos'
-                if (data && data.partidos && data.partidos.length > 0) {
-                    const partido = data.partidos[0];
-                    const local = partido.local;
-                    const visitante = partido.visitante;
-                    const marcador = partido.marcador;
-
-                    const nuevoHome = parseInt(marcador.local) || 0;
-                    const nuevoAway = parseInt(marcador.visitante) || 0;
-
-                    // Revisar memoria (localStorage) para ver cómo quedó el partido la última vez
-                    const savedHomeStr = localStorage.getItem(`alac_home_${fixtureId}`);
-                    const savedAwayStr = localStorage.getItem(`alac_away_${fixtureId}`);
-                    const savedHome = savedHomeStr !== null ? parseInt(savedHomeStr) : null;
-                    const savedAway = savedAwayStr !== null ? parseInt(savedAwayStr) : null;
-
-                    let isHiddenGoal = false;
-
-                    // Si teníamos un marcador anterior guardado y el nuevo es MAYOR, hubo gol mientras no estábamos
-                    if (savedHome !== null && savedAway !== null && (nuevoHome > savedHome || nuevoAway > savedAway)) {
-                        isHiddenGoal = true;
-                        // Pintamos la pantalla temporalmente con el marcador VIEJO
-                        currentHomeScore = savedHome;
-                        currentAwayScore = savedAway;
-                    } else {
-                        // Pintamos con el marcador actual normal
-                        currentHomeScore = nuevoHome;
-                        currentAwayScore = nuevoAway;
-                    }
-
-                    // Mostrar el contenedor del marcador
-                    document.getElementById('scoreboard').style.display = 'flex';
-                    
-                    // Asignar datos del local
-                    const homeLogoUrl = local.bandera_url || local.bandera || local.logo;
-                    if (homeLogoUrl) document.getElementById('home-logo').src = homeLogoUrl;
-                    document.getElementById('home-name').innerText = getShortName(local.nombre, local.codigo_iso);
-                    document.getElementById('home-score').innerText = currentHomeScore;
-
-                    // Asignar datos del visitante
-                    const awayLogoUrl = visitante.bandera_url || visitante.bandera || visitante.logo;
-                    if (awayLogoUrl) document.getElementById('away-logo').src = awayLogoUrl;
-                    document.getElementById('away-name').innerText = getShortName(visitante.nombre, visitante.codigo_iso);
-                    document.getElementById('away-score').innerText = currentAwayScore;
-
-                    // Guardar el resultado real más reciente en la memoria para la próxima carga
-                    localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
-                    localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
-
-                    // Si detectamos un gol mientras estábamos apagados, calculamos el tiempo y lanzamos
-                    if (isHiddenGoal) {
-                        const elapsed = Date.now() - pageLoadTime;
-                        const isEcuador = checkEcuadorGoal(nuevoHome, savedHome, nuevoAway, savedAway, partido);
-                        triggerGoalAnimation(nuevoHome, nuevoAway, elapsed, isEcuador);
-                    }
-                    
-                    // Iniciar el chequeo de goles
-                    startGoalPolling(fixtureId);
-                } else {
-                    console.error("No se encontró el partido con fixture_id:", fixtureId);
-                }
-            } catch (error) {
-                console.error(`Error al consultar el partido inicial ${fixtureId}:`, error);
-            }
-        }
-
-        // Función para activar visualmente el gol sincronizado
-        function triggerGoalAnimation(newHomeScore, newAwayScore, timeElapsed = 0, isEcuadorGoal = true) {
-            console.log(`¡GOL DETECTADO! Sincronizando animación con retraso de ${timeElapsed}ms... (Ecuador: ${isEcuadorGoal})`);
-            
-            // Actualizar variables de estado internas
-            currentHomeScore = newHomeScore;
-            currentAwayScore = newAwayScore;
-
-            // Adelantar toda la animación CSS usando un delay negativo igual al tiempo transcurrido
-            container.style.setProperty('--delay', `-${timeElapsed}ms`);
-
-            if (isEcuadorGoal) {
-                // Reproducir toda la animación CSS y video agregando la clase 'is-goal' al contenedor
-                container.classList.add('is-goal');
-
-                // Actualizar el DOM exactamente a los 3500ms del tiempo global del anuncio
-                const domUpdateWait = Math.max(0, 3500 - timeElapsed);
-                setTimeout(() => {
-                    document.getElementById('home-score').innerText = newHomeScore;
-                    document.getElementById('away-score').innerText = newAwayScore;
-                }, domUpdateWait);
-            } else {
-                // Animación rápida solo de círculos para otros equipos (Inicia a los 3.03s)
-                container.classList.add('is-goal-other');
-
-                // La animación other inicia a los 3030ms y dura 2s. En el 50% de la animación (4030ms) cubre toda la pantalla.
-                const domUpdateWait = Math.max(0, 4030 - timeElapsed);
-                setTimeout(() => {
-                    document.getElementById('home-score').innerText = newHomeScore;
-                    document.getElementById('away-score').innerText = newAwayScore;
-                }, domUpdateWait);
-            }
-        }
-
-        // --- POLLING (Consulta periódica para detectar goles) ---
-        function startGoalPolling(fixtureId) {
-            console.log("Iniciando consulta constante para detectar goles...");
-            
-            // Revisa cada 1 segundo (1000ms)
-            setInterval(async () => {
-                try {
-                    const response = await fetch(`${API_URL}/partidos?id=${fixtureId}`, { cache: "no-store" });
-                    const result = await response.json();
-                    
-                    if (result && result.partidos && result.partidos.length > 0) {
-                        const partido = result.partidos[0];
-                        const nuevoHome = parseInt(partido.marcador.local) || 0;
-                        const nuevoAway = parseInt(partido.marcador.visitante) || 0;
-
-                        // Si alguno de los puntajes es mayor al que teníamos guardado, ¡hubo un gol en vivo!
-                        if (nuevoHome > currentHomeScore || nuevoAway > currentAwayScore) {
-                            const timeElapsed = Date.now() - pageLoadTime;
-                            const isEcuador = checkEcuadorGoal(nuevoHome, currentHomeScore, nuevoAway, currentAwayScore, partido);
-                            
-                            // Límite de tiempo para sincronizar: 3030ms para ambos, ya que la animación de círculos también inicia en el segundo 3.03.
-                            const maxSyncTime = 3030;
-
-                            // Si estamos dentro del límite de tiempo, lanzamos la animación
-                            if (timeElapsed <= maxSyncTime) {
-                                triggerGoalAnimation(nuevoHome, nuevoAway, timeElapsed, isEcuador);
-                                // Actualizar la memoria permanente
-                                localStorage.setItem(`alac_home_${fixtureId}`, nuevoHome);
-                                localStorage.setItem(`alac_away_${fixtureId}`, nuevoAway);
-                            } else {
-                                // Si pasamos el tiempo, la animación no alcanzaría a mostrarse bien.
-                                console.log(`Gol detectado muy tarde (${timeElapsed}ms). Se pospone la animación para la siguiente pasada.`);
-                                
-                                // Actualizamos memoria local para no repetir este log, 
-                                // pero dejamos el localStorage SIN ACTUALIZAR. 
-                                // Así, en la próxima carga de la página, detectará un gol oculto al instante.
-                                currentHomeScore = nuevoHome;
-                                currentAwayScore = nuevoAway;
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error consultando endpoint de gol:", err);
-                }
-            }, 1000);
-        }
-
         // Obtener el ID de la URL y arrancar
         const urlParams = new URLSearchParams(window.location.search);
         let fixtureId = urlParams.get('id');
@@ -503,7 +279,12 @@
             fixtureId = 9;
         }
         
-        fetchInitialFixtureData(fixtureId);
+        // Inicializar la lógica encapsulada
+        const goalManager = new GoalManager({
+            fixtureId: fixtureId
+        });
+        
+        goalManager.fetchInitialData();
     </script>
 </body>
 </html>
