@@ -219,9 +219,21 @@
             border-radius: 2px;
             box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
     </style>
 </head>
 <body>
+    <div id="loading-overlay"></div>
 
     <div class="container">
         <!-- Video de fondo (siempre reproduciéndose en bucle) -->
@@ -273,8 +285,62 @@
         const pageLoadTime = Date.now();
 
         const container = document.querySelector('.container');
+        const videoFondo = document.querySelector('.video-fondo');
         const golVideo = document.querySelector('.gol-overlay');
         const azulHole = document.querySelector('.azul-hole');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // --- LÓGICA DE CARGA (PANTALLA NEGRA) ---
+        let dataLoaded = false;
+        let videoFondoLoaded = false;
+        let golOverlayLoaded = false;
+        let fontsLoadedFlag = false;
+
+        document.fonts.ready.then(() => {
+            fontsLoadedFlag = true;
+            checkAllLoaded();
+        });
+
+        function checkAllLoaded() {
+            if (dataLoaded && videoFondoLoaded && golOverlayLoaded && fontsLoadedFlag) {
+                // Damos un pequeño respiro de 100ms al navegador para renderizar el DOM y evitar saltos
+                setTimeout(() => {
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => { loadingOverlay.style.display = 'none'; }, 500);
+                }, 100);
+            }
+        }
+
+        const checkVideoLoad = (video, setLoadedFlag) => {
+            if (video.readyState >= 4) {
+                setLoadedFlag();
+            } else {
+                video.addEventListener('canplaythrough', setLoadedFlag, { once: true });
+                video.addEventListener('loadeddata', setLoadedFlag, { once: true }); // Fallback
+            }
+        };
+
+        const checkBackgroundPlaying = (video, setLoadedFlag) => {
+            // Asegurarnos de que el video de fondo realmente ha empezado a reproducir al menos un frame
+            if (video.currentTime > 0) {
+                setLoadedFlag();
+            } else {
+                video.addEventListener('timeupdate', () => {
+                    setLoadedFlag();
+                }, { once: true });
+            }
+        };
+
+        checkBackgroundPlaying(videoFondo, () => { videoFondoLoaded = true; checkAllLoaded(); });
+        checkVideoLoad(golVideo, () => { golOverlayLoaded = true; checkAllLoaded(); });
+
+        // Fallback: si después de 10 segundos no carga algo, mostramos de todos modos
+        setTimeout(() => {
+            if (loadingOverlay.style.display !== 'none') {
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => { loadingOverlay.style.display = 'none'; }, 500);
+            }
+        }, 10000);
         
         // Cuando inicia la animación CSS de gol, esperamos a que llegue al 3.03s del tiempo general del contenido
         golVideo.addEventListener('animationstart', () => {
@@ -405,11 +471,45 @@
                     
                     // Iniciar el chequeo de goles
                     startGoalPolling(fixtureId);
+                    
+                    // Comprobar que las imágenes se han cargado antes de remover la pantalla negra
+                    const homeImg = document.getElementById('home-logo');
+                    const awayImg = document.getElementById('away-logo');
+                    
+                    let homeImgLoaded = !homeLogoUrl;
+                    let awayImgLoaded = !awayLogoUrl;
+
+                    const finishDataLoad = () => {
+                        if (homeImgLoaded && awayImgLoaded && !dataLoaded) {
+                            dataLoaded = true;
+                            checkAllLoaded();
+                        }
+                    };
+
+                    if (homeLogoUrl) {
+                        if (homeImg.complete) homeImgLoaded = true;
+                        else {
+                            homeImg.onload = () => { homeImgLoaded = true; finishDataLoad(); };
+                            homeImg.onerror = () => { homeImgLoaded = true; finishDataLoad(); };
+                        }
+                    }
+                    if (awayLogoUrl) {
+                        if (awayImg.complete) awayImgLoaded = true;
+                        else {
+                            awayImg.onload = () => { awayImgLoaded = true; finishDataLoad(); };
+                            awayImg.onerror = () => { awayImgLoaded = true; finishDataLoad(); };
+                        }
+                    }
+                    finishDataLoad();
                 } else {
                     console.error("No se encontró el partido con fixture_id:", fixtureId);
+                    dataLoaded = true;
+                    checkAllLoaded();
                 }
             } catch (error) {
                 console.error(`Error al consultar el partido inicial ${fixtureId}:`, error);
+                dataLoaded = true;
+                checkAllLoaded();
             }
         }
 
